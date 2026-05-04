@@ -34,7 +34,6 @@ jobs:
           else
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
-
       - name: Commit updated known URLs and hash
         if: steps.run.outputs.changed == 'true'
         run: |
@@ -45,7 +44,6 @@ jobs:
           git add .known_urls .last_report_hash
           git diff --cached --quiet || git commit -m "update known vacancies [skip ci]"
           git push
-
   daily_summary:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -69,7 +67,6 @@ jobs:
           else
             echo "should_send=false" >> $GITHUB_OUTPUT
           fi
-
       - name: Send daily summary
         if: steps.time_check.outputs.should_send == 'true'
         env:
