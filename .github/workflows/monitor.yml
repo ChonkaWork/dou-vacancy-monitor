@@ -8,26 +8,36 @@ on:
     - cron: "30 17 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Run vacancy checker
+        id: run
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python check_vacancies.py
+        run: |
+          python check_vacancies.py
+          echo "changed=$(git diff --quiet .known_urls 2>/dev/null && echo 'false' || echo 'true')" >> $GITHUB_OUTPUT
 
       - name: Commit updated known URLs
+        if: steps.run.outputs.changed == 'true'
         run: |
           git config user.name "vacancy-bot"
           git config user.email "vacancy-bot@users.noreply.github.com"
           git add .known_urls
-          git diff --cached --quiet || git commit -m "update known vacancies [skip ci]"
+          git commit -m "update known vacancies [skip ci]"
           git push
