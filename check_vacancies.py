@@ -116,7 +116,65 @@ def format_report(new_items: list[dict], dou_items: list[dict], djinni_items: li
     return "\n".join(lines)
 
 
+def get_todays_items(db_path: Path) -> dict[str, list[dict]]:
+    """Get all vacancies added today, grouped by source."""
+    conn = sqlite3.connect(db_path)
+    try:
+        has_source = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='vacancy_sources'"
+        ).fetchone()
+        if has_source:
+            rows = conn.execute(
+                """
+                SELECT v.title, v.company, v.url, vs.source
+                FROM vacancies v
+                JOIN vacancy_sources vs ON v.url = vs.url
+                WHERE DATE(v.first_seen_at) = DATE('now')
+                ORDER BY v.first_seen_at ASC
+                """
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT title, company, url, 'dou' FROM vacancies WHERE DATE(first_seen_at) = DATE('now') ORDER BY first_seen_at ASC"
+            ).fetchall()
+        by_source: dict[str, list[dict]] = {}
+        for r in rows:
+            by_source.setdefault(r[3], []).append({"title": r[0], "company": r[1], "url": r[2]})
+        return by_source
+    finally:
+        conn.close()
+
+
+def format_daily_summary(by_source: dict[str, list[dict]]) -> str:
+    total = sum(len(items) for items in by_source.values())
+    lines = [f"📊 <b>Daily Summary</b> ({total} vacancies today)\n"]
+    source_icons = {"dou": "🔵", "djinni": "🟠"}
+    for source, items in by_source.items():
+        icon = source_icons.get(source, "📌")
+        label = "DOU" if source == "dou" else "DJINNI"
+        lines.append(f"{icon} <b>{label}</b> ({len(items)}):")
+        for idx, item in enumerate(items, 1):
+            lines.append(f"{idx}. <b>{item['title']}</b> — {item['company']}")
+            lines.append(f"   {item['url']}")
+        lines.append("")
+    if not by_source:
+        lines.append("_(No new vacancies today)_")
+    return "\n".join(lines)
+
+
 def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--daily-summary", action="store_true")
+    args = parser.parse_args()
+
+    if args.daily_summary:
+        by_source = get_todays_items(DB_PATH)
+        report = format_daily_summary(by_source)
+        tg_send(report)
+        total = sum(len(items) for items in by_source.values())
+        print(f"Daily summary sent: {total} vacancies")
+        return
     known = load_known()
     print(f"Known: {len(known)}")
 
