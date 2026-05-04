@@ -2,9 +2,9 @@ name: Vacancy Monitor
 
 on:
   schedule:
-    # 08:30–19:30 Kyiv (UTC+2) = 06:30–17:30 UTC, every 5 minutes
+    # 08:30–19:30 Kyiv (UTC+2) = 06:30–17:30 UTC, every 3 minutes
     - cron: "30 6 * * *"
-    - cron: "*/5 7-16 * * *"
+    - cron: "*/3 7-16 * * *"
     - cron: "30 17 * * *"
   workflow_dispatch:
 

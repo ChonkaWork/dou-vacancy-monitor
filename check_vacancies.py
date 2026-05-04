@@ -146,9 +146,12 @@ def main() -> None:
     dou_latest = get_latest_items(DB_PATH, "dou", 5)
     djinni_latest = get_latest_items(DB_PATH, "djinni", 5)
 
-    report = format_report(actual_new, dou_latest, djinni_latest)
-    print("Sending report...")
-    tg_send(report)
+    if actual_new:
+        report = format_report(actual_new, dou_latest, djinni_latest)
+        print(f"Sending {len(actual_new)} new vacancies...")
+        tg_send(report)
+    else:
+        print("No new vacancies, skipping Telegram")
 
     known |= {i["url"] for i in all_new}
     save_known(known)
