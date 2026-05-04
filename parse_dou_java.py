@@ -147,6 +147,15 @@ def save_new_items(db_path: Path, items: list[dict[str, str]]) -> list[dict[str,
     conn = sqlite3.connect(db_path)
     try:
         ensure_db(conn)
+        # Ensure vacancy_sources table exists
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vacancy_sources (
+                url TEXT PRIMARY KEY,
+                source TEXT NOT NULL DEFAULT 'dou'
+            )
+            """
+        )
         new_items: list[dict[str, str]] = []
         for item in items:
             cur = conn.execute(
@@ -158,6 +167,7 @@ def save_new_items(db_path: Path, items: list[dict[str, str]]) -> list[dict[str,
             )
             if cur.rowcount == 1:
                 new_items.append(item)
+                conn.execute("INSERT OR IGNORE INTO vacancy_sources (url, source) VALUES (?, ?)", (item["url"], "dou"))
         conn.commit()
         return new_items
     finally:
