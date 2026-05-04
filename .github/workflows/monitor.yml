@@ -1,11 +1,6 @@
 name: Vacancy Monitor
 
 on:
-  schedule:
-    # Every 3 min, 08:30–19:30 Kyiv (06:30–17:30 UTC)
-    - cron: "30 6 * * *"
-    - cron: "*/3 7-16 * * *"
-    - cron: "30 17 * * *"
   workflow_dispatch:
 
 permissions:
@@ -48,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: check
-    if: github.event_name == 'schedule' && github.event.schedule == '30 17 * * *'
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v5
 
@@ -56,7 +51,20 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Check if daily summary time
+        id: time_check
+        run: |
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          # 17:30 UTC = 20:30 Kyiv (after 19:30 last vacancy check)
+          if [ "$HOUR" -ge 17 ] && [ "$MINUTE" -ge 25 ]; then
+            echo "should_send=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_send=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Send daily summary
+        if: steps.time_check.outputs.should_send == 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
