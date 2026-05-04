@@ -28,15 +28,20 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           python check_vacancies.py
-          echo "changed=$(git diff --quiet .known_urls 2>/dev/null && echo 'false' || echo 'true')" >> $GITHUB_OUTPUT
+          # Check if we need to commit (known URLs or hash file changed)
+          if git diff --quiet .known_urls .last_report_hash 2>/dev/null; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Commit updated known URLs
+      - name: Commit updated known URLs and hash
         if: steps.run.outputs.changed == 'true'
         run: |
           git config user.name "vacancy-bot"
           git config user.email "vacancy-bot@users.noreply.github.com"
-          git add .known_urls
-          git commit -m "update known vacancies [skip ci]"
+          git add .known_urls .last_report_hash
+          git diff --cached --quiet || git commit -m "update known vacancies [skip ci]"
           git push
 
   daily_summary:
