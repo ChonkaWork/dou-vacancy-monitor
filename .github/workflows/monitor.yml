@@ -2,9 +2,10 @@ name: Vacancy Monitor
 
 on:
   schedule:
-    # Every 15 min, 05:00–23:00 UTC (07:00–01:00 Kyiv UTC+2)
-    # This is ~64 runs/day, each ~10-20 sec = ~20 min/day, well within 2000 min/mo free
-    - cron: "*/15 5-23 * * *"
+    # 08:30–19:30 Kyiv (UTC+2) = 06:30–17:30 UTC, every 5 minutes
+    - cron: "30 6 * * *"
+    - cron: "*/5 7-16 * * *"
+    - cron: "30 17 * * *"
   workflow_dispatch:
 
 jobs:

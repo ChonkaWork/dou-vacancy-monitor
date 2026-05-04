@@ -57,19 +57,62 @@ def save_known(urls: set[str]) -> None:
     KNOWN_FILE.write_text("\n".join(sorted(urls)))
 
 
-def format_alert(new_items: list[dict]) -> str:
-    by_source: dict[str, list[dict]] = {}
-    for item in new_items:
-        by_source.setdefault(item.get("source", "dou"), []).append(item)
+def get_latest_items(db_path: Path, source: str, limit: int = 5) -> list[dict]:
+    """Get last N vacancies from DB for a given source."""
+    conn = sqlite3.connect(db_path)
+    try:
+        has_source = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='vacancy_sources'"
+        ).fetchone()
+        if has_source:
+            rows = conn.execute(
+                """
+                SELECT v.title, v.company, v.url
+                FROM vacancies v
+                JOIN vacancy_sources vs ON v.url = vs.url
+                WHERE vs.source = ?
+                ORDER BY v.first_seen_at DESC
+                LIMIT ?
+                """,
+                (source, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT title, company, url FROM vacancies ORDER BY first_seen_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        return [{"title": r[0], "company": r[1], "url": r[2]} for r in rows]
+    finally:
+        conn.close()
 
-    lines = [f"🔥 <b>New Java vacancies!</b> ({len(new_items)})\n"]
-    for source, items in by_source.items():
-        label = "DJINNI" if source == "djinni" else "DOU"
-        lines.append(f"📌 <b>{label}</b> ({len(items)}):")
-        for item in items:
-            lines.append(f"• <b>{item['title']}</b> — {item['company']}")
-            lines.append(item["url"])
-        lines.append("")
+
+def format_report(new_items: list[dict], dou_items: list[dict], djinni_items: list[dict]) -> str:
+    new_urls = {i["url"] for i in new_items}
+
+    lines = ["<b>📋 Java Vacancies Update</b>\n"]
+
+    # DOU section
+    lines.append("<b>🔵 DOU</b>")
+    for idx, item in enumerate(dou_items, 1):
+        marker = "🆕 " if item["url"] in new_urls else ""
+        lines.append(f"{marker}{idx}. <b>{item['title']}</b> — {item['company']}")
+        lines.append(f"   {item['url']}")
+    if not dou_items:
+        lines.append("   _(no vacancies found)_")
+    lines.append("")
+
+    # Djinni section
+    lines.append("<b>🟠 DJINNI</b>")
+    for idx, item in enumerate(djinni_items, 1):
+        marker = "🆕 " if item["url"] in new_urls else ""
+        lines.append(f"{marker}{idx}. <b>{item['title']}</b> — {item['company']}")
+        lines.append(f"   {item['url']}")
+    if not djinni_items:
+        lines.append("   _(no vacancies found)_")
+    lines.append("")
+
+    if new_items:
+        lines.append(f"🔥 <b>New this check: {len(new_items)}</b>")
     return "\n".join(lines)
 
 
@@ -100,15 +143,14 @@ def main() -> None:
     new_urls = {i["url"] for i in all_new} - known
     actual_new = [i for i in all_new if i["url"] in new_urls]
 
-    if actual_new:
-        alert = format_alert(actual_new)
-        print(f"Sending {len(actual_new)} alerts...")
-        tg_send(alert)
-        known |= {i["url"] for i in actual_new}
-    else:
-        known |= {i["url"] for i in all_new}
-        print("No new vacancies")
+    dou_latest = get_latest_items(DB_PATH, "dou", 5)
+    djinni_latest = get_latest_items(DB_PATH, "djinni", 5)
 
+    report = format_report(actual_new, dou_latest, djinni_latest)
+    print("Sending report...")
+    tg_send(report)
+
+    known |= {i["url"] for i in all_new}
     save_known(known)
     print(f"Known now: {len(known)}")
 
