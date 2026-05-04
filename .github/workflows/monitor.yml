@@ -1,0 +1,32 @@
+name: Vacancy Monitor
+
+on:
+  schedule:
+    # Every 15 min, 05:00–23:00 UTC (07:00–01:00 Kyiv UTC+2)
+    # This is ~64 runs/day, each ~10-20 sec = ~20 min/day, well within 2000 min/mo free
+    - cron: "*/15 5-23 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run vacancy checker
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python check_vacancies.py
+
+      - name: Commit updated known URLs
+        run: |
+          git config user.name "vacancy-bot"
+          git config user.email "vacancy-bot@users.noreply.github.com"
+          git add .known_urls
+          git diff --cached --quiet || git commit -m "update known vacancies [skip ci]"
+          git push
