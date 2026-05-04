@@ -134,9 +134,11 @@ def main() -> None:
         # Content changed or first run -> Send
         print(f"Report changed. Sending...")
         tg_send(report)
-        hash_file.write_text(report_hash)
     else:
         print("No changes in top vacancies. Skipping.")
+
+    # Always persist the hash to ensure the file exists for the commit step
+    hash_file.write_text(report_hash)
 
     if new_items:
         known.update(i["url"] for i in new_items)

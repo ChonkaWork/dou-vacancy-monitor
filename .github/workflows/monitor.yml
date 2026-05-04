@@ -40,6 +40,8 @@ jobs:
         run: |
           git config user.name "vacancy-bot"
           git config user.email "vacancy-bot@users.noreply.github.com"
+          # Ensure files exist to prevent git add errors
+          touch .known_urls .last_report_hash
           git add .known_urls .last_report_hash
           git diff --cached --quiet || git commit -m "update known vacancies [skip ci]"
           git push
